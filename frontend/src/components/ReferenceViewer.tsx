@@ -21,8 +21,8 @@ export const ReferenceViewer: React.FC<Props> = ({ references, stats }) => {
     <div className="h-full flex flex-col p-4 border-t border-gray-200 bg-white">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm font-bold text-gray-600 uppercase tracking-wider">Reference String</h2>
-        <div className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100 font-bold">
-          {stats.algorithm}
+        <div className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded border border-blue-100 font-bold tracking-wide mr-1">
+          {stats.algorithm || 'FIFO'}
         </div>
       </div>
       
@@ -76,8 +76,8 @@ export const ReferenceViewer: React.FC<Props> = ({ references, stats }) => {
         <div className="flex flex-col flex-1">
           <span className="text-gray-400 text-xs">Hit Ratio ({hitRatio}%)</span>
           <div className="w-full bg-gray-100 h-2 rounded-full mt-1 overflow-hidden flex">
-            <div className="bg-emerald-500 h-full transition-all" style={{ width: `${hitRatio}%` }} />
-            <div className="bg-rose-500 h-full transition-all" style={{ width: `${100 - hitRatio}%` }} />
+            <div className="bg-emerald-500 h-full transition-all" style={{ width: stats.total > 0 ? `${hitRatio}%` : '0%' }} />
+            <div className="bg-rose-500 h-full transition-all" style={{ width: stats.total > 0 ? `${100 - hitRatio}%` : '0%' }} />
           </div>
         </div>
       </div>
