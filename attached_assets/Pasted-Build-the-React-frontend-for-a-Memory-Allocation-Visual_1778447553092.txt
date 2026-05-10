@@ -1,0 +1,188 @@
+Build the React frontend for a Memory Allocation Visualizer — an OS lab 
+project whose C backend is already running and streaming data. The UI is 
+a pure display client. Do not add any logic — only render what the backend 
+sends.
+
+---
+
+BACKEND CONNECTION
+
+The Python bridge runs on localhost:5000 with two endpoints:
+
+GET /stream — SSE stream emitting JSON events:
+  {"type": "frame_update", "frames": [...]}
+  {"type": "process_update", "processes": [...]}
+  {"type": "fault", "frame_id": 3, "evicted_page": 1, "loaded_page": 4}
+  {"type": "hit", "frame_id": 2}
+  {"type": "log", "module": "REPLACE", "message": "...", "timestamp": "..."}
+  {"type": "meminfo", "total": "8GB", "used": "3.2GB", "free": "4.8GB"}
+
+POST /command — body is a plain text command string:
+  "add P1 3", "kill P1", "algo lru", "frames 4", "reset", "status"
+
+---
+
+LAYOUT — Single page, four panels + top bar
+
+┌─────────────────── Memory Bar (top strip) ───────────────────┐
+├──────────────────────────┬───────────────────────────────────┤
+│                          │                                   │
+│     Frame Grid (A)       │      Process List (B)             │
+│     (left, 60%)          │      (right, 40%)                 │
+│                          │                                   │
+├──────────────────────────┼───────────────────────────────────┤
+│                          │                                   │
+│   Reference Viewer (C)   │      Log Feed (D)                 │
+│   (left, 60%)            │      (right, 40%)                 │
+│                          │                                   │
+└──────────────────────────┴───────────────────────────────────┘
+
+Below the panels: a command input bar (full width) and a 
+"Learning Mode" button in the top-right corner of the header.
+
+---
+
+PANEL A — Frame Grid
+
+A responsive grid of rectangular cards, one per frame. Each card shows:
+- Frame ID (top-left, small monospace label)
+- Process name (center, bold)
+- Page number (bottom-right, small)
+- FREE state: light grey card, dashed border, muted "FREE" text
+
+Color per process: P1=blue, P2=amber, P3=emerald, P4=rose, P5=violet.
+Each color has a light fill version (10% opacity background, full-color 
+border and text) for an airy premium look.
+
+Animations:
+- Allocation: card fades from grey to process color with a gentle scale-up
+- Page fault/eviction: card flashes red border for 400ms, then transitions
+- Process kill/release: card fades back to grey
+
+Grid layout: auto-fill columns, min 100px per card.
+
+---
+
+PANEL B — Process List
+
+A vertical list of active process cards. Each card shows:
+- Colored left border matching process color
+- Process name + real Linux PID (from SSE)
+- "X pages requested / Y frames held" 
+- A thin progress bar showing frames held vs requested
+- Real RSS from /proc (small muted label at bottom)
+- A "Kill" button (subtle, appears on hover)
+
+Slide-in animation on creation, fade+slide-out on termination.
+
+---
+
+PANEL C — Reference Viewer
+
+Top section: the reference string displayed as a horizontal row of 
+pill-shaped tokens. The current access is highlighted with the process 
+color. Past accesses are muted. Faults show a small red dot above the 
+token; hits show a green dot.
+
+Below: a running stats row showing:
+- Total accesses, Hits, Faults
+- Hit Ratio as a percentage with a thin progress bar
+- Current algorithm badge (FIFO / LRU / OPT)
+
+---
+
+PANEL D — Log Feed
+
+A dark-background scrolling terminal panel (the only dark element on the 
+page — intentional contrast). Monospace font. Each log line is 
+color-coded by module tag:
+- [SYSTEM] — slate
+- [PROCESS] — blue
+- [MEMORY] — emerald
+- [SYNC] — amber
+- [REPLACE] — rose
+- [PROC] — violet
+- [CMD] — grey
+
+Auto-scrolls to bottom. Max 200 lines retained.
+
+---
+
+TOP BAR — Memory Bar
+
+A slim bar showing real system RAM from /proc/meminfo:
+- "System RAM" label
+- Used / Total text
+- A segmented thin bar: used=blue fill, free=light grey
+
+Far right: algorithm selector dropdown (FIFO / LRU / OPT) that POSTs 
+"algo fifo/lru/opt" to /command on change.
+
+---
+
+COMMAND INPUT BAR (bottom)
+
+A full-width input with monospace font and a "Run" button. On submit, 
+POST to /command. Show last 3 commands as dismissible chips above the 
+input. Placeholder: "add P1 3 | kill P1 | algo lru | frames 8 | reset"
+
+---
+
+LEARNING MODE
+
+A button in the header opens a modal with 6 scenario cards:
+1. Empty Memory — Baseline
+2. Enough Free Memory — Demand paging
+3. Memory Becomes Full — Capacity limits  
+4. Page Fault and Replacement
+5. FIFO vs LRU Comparison
+6. Thrashing
+
+Each card has a title, one-line description, and a "Start" button.
+
+On Start: close modal, show an annotation sidebar beside the frame grid. 
+Fire the scenario's commands sequentially with delays (defined in 
+scenario JSON files). Show contextual text annotations triggered by 
+event types from the SSE stream.
+
+Scenario JSON format:
+{
+  "name": "Page Fault and Replacement",
+  "commands": [
+    {"cmd": "frames 4", "delay": 0},
+    {"cmd": "algo fifo", "delay": 500},
+    {"cmd": "add P1 6", "delay": 1000}
+  ],
+  "annotations": [
+    {"trigger": "fault", "text": "A page fault occurs when the 
+    requested page is not loaded in any frame. The OS must now 
+    choose a victim frame to evict."}
+  ]
+}
+
+---
+
+AESTHETIC — Light Premium
+
+- Background: #F8F9FB (very light grey-white)
+- Surface cards: #FFFFFF with subtle box-shadow
+- Borders: 1px solid #E5E7EB
+- Primary accent: #2563EB (blue)
+- Font: 'Geist' or 'DM Sans' for UI, 'JetBrains Mono' for all 
+  data/log/code text
+- Corner radius: 10px on cards, 6px on buttons
+- No gradients except on the top header bar (very subtle)
+- Spacing is generous — this should feel open, not cramped
+- The Log Feed panel is the only dark surface (#0F172A background)
+
+Import fonts from Google Fonts. Use Tailwind for layout and spacing. 
+Write component CSS manually for animations and custom colors.
+
+---
+
+TECH STACK
+
+Vite + React. All in one repo under frontend/. Components in 
+frontend/src/components/. Scenarios in frontend/src/scenarios/. 
+Use EventSource API for SSE. Use fetch for POST /command. 
+No Redux — useState and useEffect only.

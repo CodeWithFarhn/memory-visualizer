@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #F8F9FB;
+  --surface: #FFFFFF;
+  --border: #E5E7EB;
+  --accent: #2563EB;
+  --radius-card: 10px;
+  --radius-btn: 6px;
+  --font-ui: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Process colors */
+  --p1-color: #2563EB;
+  --p1-bg: rgba(37, 99, 235, 0.1);
+  --p2-color: #D97706;
+  --p2-bg: rgba(217, 119, 6, 0.1);
+  --p3-color: #059669;
+  --p3-bg: rgba(5, 150, 105, 0.1);
+  --p4-color: #E11D48;
+  --p4-bg: rgba(225, 29, 72, 0.1);
+  --p5-color: #7C3AED;
+  --p5-bg: rgba(124, 58, 237, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: #111827;
+}
+
+/* Frame card animations */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes flashFault {
+  0%, 100% { box-shadow: none; }
+  20%, 60% { box-shadow: 0 0 0 2px #E11D48, 0 0 12px rgba(225, 29, 72, 0.4); }
+}
+
+@keyframes fadeToGrey {
+  from { opacity: 1; }
+  to { opacity: 0.4; }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+
+.frame-card-enter {
+  animation: fadeInScale 0.3s ease-out forwards;
+}
+
+.frame-card-fault {
+  animation: flashFault 0.4s ease-in-out;
+}
+
+.frame-card-hit {
+  transition: box-shadow 0.2s ease;
+  box-shadow: 0 0 0 2px #059669, 0 0 10px rgba(5, 150, 105, 0.3);
+}
+
+.process-card-enter {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+.process-card-exit {
+  animation: slideOutRight 0.3s ease-in forwards;
+}
+
+/* Scrollbar styling for log feed */
+.log-feed::-webkit-scrollbar {
+  width: 4px;
+}
+.log-feed::-webkit-scrollbar-track {
+  background: transparent;
+}
+.log-feed::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 2px;
+}
