@@ -26,6 +26,7 @@
 #include <sys/time.h>
 
 extern SharedMemory *shm;
+extern void shm_print_status(void);
 static pthread_t thread_id;
 static int       shutdown_flag = 0;
 
@@ -189,6 +190,9 @@ static void *replacement_thread_func(void *arg) {
 
         /* Tell child it can proceed */
         fault_resolve();
+
+        /* Update frame grid to show the freed frame */
+        shm_print_status();
 
         mem_lock_release("Replacement", lock_acquired);
 

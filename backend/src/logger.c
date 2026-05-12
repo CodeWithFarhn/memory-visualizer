@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 /* File descriptor for /tmp/mem_state_pipe — opened by logger_init() */
 static int state_pipe_fd = -1;
@@ -61,10 +62,14 @@ void logger_init(void) {
      * fails with ENXIO (no reader present) — this keeps Phase 1
      * working even when no bridge is running.
      */
-    state_pipe_fd = open(STATE_PIPE_PATH, O_WRONLY | O_NONBLOCK);
+    state_pipe_fd = open(STATE_PIPE_PATH, O_WRONLY);
     if (state_pipe_fd == -1) {
-        /* No bridge attached — state pipe writes will be silently skipped */
+        fprintf(stderr, "[Logger] Failed to open state pipe %s: %s\n", 
+                STATE_PIPE_PATH, strerror(errno));
         state_pipe_fd = -1;
+    } else {
+        fprintf(stderr, "[Logger] State pipe %s opened (fd %d)\n", 
+                STATE_PIPE_PATH, state_pipe_fd);
     }
 }
 
@@ -122,7 +127,7 @@ void log_event(const char *module, const char *fmt, ...) {
 void emit_event(const char *type, const char *json_data) {
     if (state_pipe_fd == -1) return;  /* no bridge — skip silently */
 
-    char envelope[2048];
+    char envelope[65536];
     int len = snprintf(envelope, sizeof(envelope),
         "{\"type\":\"%s\",\"ts\":%lld,\"data\":%s}\n",
         type, current_epoch_ms(), json_data

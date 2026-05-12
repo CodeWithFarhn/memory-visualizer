@@ -111,7 +111,7 @@ def open_state_pipe():
 
 def sse_stream():
     """Generator that yields JSON events as SSE messages."""
-    buffer = ""
+    raw_buffer = b""
     # Send an initial connect event
     yield f"data: {json.dumps({'type': 'bridge_connect', 'data': {}})}\n\n"
     
@@ -123,14 +123,22 @@ def sse_stream():
             break
             
         try:
-            chunk = os.read(state_pipe_fd, 4096).decode('utf-8')
+            # Read raw bytes first to avoid UnicodeDecodeError on partial characters
+            chunk = os.read(state_pipe_fd, 65536)
             if chunk:
-                buffer += chunk
-                while '\n' in buffer:
-                    line, buffer = buffer.split('\n', 1)
-                    if line.strip():
-                        # The C backend writes complete JSON objects per line
-                        yield f"data: {line.strip()}\n\n"
+                # Append bytes to buffer
+                raw_buffer += chunk
+                
+                # Process complete lines
+                while b'\n' in raw_buffer:
+                    line_bytes, raw_buffer = raw_buffer.split(b'\n', 1)
+                    if line_bytes.strip():
+                        try:
+                            line = line_bytes.decode('utf-8')
+                            print(f"[SSE] Sending: {line.strip()}")
+                            yield f"data: {line}\n\n"
+                        except UnicodeDecodeError as e:
+                            print(f"[Bridge] Skipping invalid UTF-8 line: {e}")
         except BlockingIOError:
             # No data available right now
             pass
@@ -241,8 +249,15 @@ def run_scenario():
 
 if __name__ == '__main__':
     print("[Bridge] Initializing...")
-    start_backend()
+    # Ensure pipes exist before opening
+    for pipe in [CMD_PIPE, STATE_PIPE]:
+        if not os.path.exists(pipe):
+            print(f"[Bridge] Creating pipe: {pipe}")
+            os.mkfifo(pipe)
+            os.chmod(pipe, 0o666)
+
     open_state_pipe()
+    start_backend()
     print("[Bridge] Starting Flask server on http://localhost:5001")
     # Use threaded=True to allow SSE and REST requests to run concurrently
     app.run(host='0.0.0.0', port=5001, threaded=True)

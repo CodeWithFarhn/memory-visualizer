@@ -6,9 +6,14 @@ backend/memory_manager
 
 # Python
 bridge/venv/
+bridge/.venv/
 bridge/__pycache__/
 bridge/*.log
 bridge/*.pid
+
+# Logs
+*.txt
+!docs/*.txt
 
 # Node / Frontend
 frontend/node_modules/
