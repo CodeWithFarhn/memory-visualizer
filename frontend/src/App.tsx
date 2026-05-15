@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useSSE } from './hooks/useSSE';
 import { useCommand } from './hooks/useCommand';
 import { FrameGrid } from './components/FrameGrid';
@@ -7,31 +7,86 @@ import { ReferenceViewer } from './components/ReferenceViewer';
 import { LogFeed } from './components/LogFeed';
 import { CommandInput } from './components/CommandInput';
 import { LearningModeModal } from './components/LearningModeModal';
+import { NarratorPanel } from './components/NarratorPanel';
 import { scenarios } from './scenarios';
+import { Scenario } from './types';
 
 function App() {
-  const { state, activeAnnotation, setExpectedAnnotations, clearActiveAnnotation } = useSSE();
+  const { state, lastEventType } = useSSE();
   const { sendCommand, history } = useCommand();
   const [showLearningModal, setShowLearningModal] = useState(false);
+  
+  const [activeScenario, setActiveScenario] = useState<Scenario | null>(null);
+  const [pulseFrameId, setPulseFrameId] = useState<number | null>(null);
+  const [highlightFrameIds, setHighlightFrameIds] = useState<number[]>([]);
+  const [highlightStat, setHighlightStat] = useState<string | null>(null);
+  const [highlightLog, setHighlightLog] = useState(false);
+
+  const frameCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  const [connector, setConnector] = useState<{from: {x: number, y: number}, to: {x: number, y: number}, color: string, visible: boolean}>({
+    from: {x: 0, y: 0}, to: {x: 0, y: 0}, color: '', visible: false
+  });
+
   const startScenario = (scenarioId: number) => {
     const scenario = scenarios.find(s => s.id === scenarioId);
     if (!scenario) return;
 
     setShowLearningModal(false);
-    setExpectedAnnotations(scenario.annotations);
-    clearActiveAnnotation();
+    setActiveScenario(scenario);
+  };
 
-    // Execute commands with their specified delays
-    scenario.commands.forEach(({ cmd, delay }) => {
-      setTimeout(() => {
-        sendCommand(cmd);
-      }, delay);
-    });
+  const closeScenario = () => {
+    setActiveScenario(null);
+    setHighlightFrameIds([]);
+    setHighlightStat(null);
+    setHighlightLog(false);
   };
 
   const handleAlgorithmChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     sendCommand(`algo ${e.target.value.toLowerCase()}`);
   };
+
+  const handleFrameHighlight = (frameId: number) => {
+    setPulseFrameId(frameId);
+    setTimeout(() => {
+      setPulseFrameId(null);
+    }, 1000);
+  };
+
+  const handleFaultConnector = useCallback((refIndex: number) => {
+    // A fault happened, we want to draw a line from the pill to the affected frame.
+    // The latest log or frame update would tell us which frame. We guess by the most recently updated frame in stats/refs?
+    // Actually, ReferenceViewer doesn't know the frame. Let's just find the frame that has this page right now.
+    const lastRef = state.references[state.references.length - 1];
+    if (!lastRef) return;
+    
+    // Slight delay to allow DOM render of the new pill
+    setTimeout(() => {
+      const pillElement = document.getElementById(`ref-pill-${refIndex}`);
+      const frame = state.frames.find(f => f.page === lastRef.page && f.process === lastRef.process);
+      if (!pillElement || !frame) return;
+
+      const frameElement = frameCardRefs.current.get(frame.id);
+      if (!frameElement) return;
+
+      const pRect = pillElement.getBoundingClientRect();
+      const fRect = frameElement.getBoundingClientRect();
+
+      const color = pillElement.style.color || '#E11D48';
+
+      setConnector({
+        from: { x: pRect.left + pRect.width / 2, y: pRect.top },
+        to: { x: fRect.left + fRect.width / 2, y: fRect.bottom },
+        color,
+        visible: true
+      });
+
+      setTimeout(() => {
+        setConnector(c => ({ ...c, visible: false }));
+      }, 1500);
+    }, 50);
+  }, [state.frames, state.references]);
 
   const usedRamMatch = state.meminfo.used.match(/(\d+\.?\d*)/);
   const totalRamMatch = state.meminfo.total.match(/(\d+\.?\d*)/);
@@ -39,6 +94,8 @@ function App() {
   const totalRam = totalRamMatch ? parseFloat(totalRamMatch[1]) : 1;
   const ramPercent = Math.min(100, (usedRam / totalRam) * 100);
 
+  const mainAreaWidth = activeScenario ? 'w-full' : 'w-full'; // layout adjustments
+  
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-[var(--bg)] text-gray-900 font-ui selection:bg-blue-200">
       
@@ -93,44 +150,56 @@ function App() {
       </header>
 
       {/* MAIN LAYOUT */}
-      <main className="flex-1 flex flex-col min-h-0 relative">
-        <div className="flex h-[55%] min-h-0">
-          <div className="w-[60%] min-w-0">
-            <FrameGrid frames={state.frames} references={state.references} />
+      <main className="flex-1 flex min-h-0 relative">
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex h-[55%] min-h-0">
+            <div className={`${activeScenario ? 'w-[42%]' : 'w-[60%]'} min-w-0 transition-all duration-300`}>
+              <FrameGrid 
+                frames={state.frames} 
+                references={state.references} 
+                pulseFrameId={pulseFrameId}
+                highlightFrameIds={highlightFrameIds}
+                frameCardRefs={frameCardRefs}
+              />
+            </div>
+            <div className={`${activeScenario ? 'w-[58%]' : 'w-[40%]'} min-w-0 transition-all duration-300`}>
+              <ProcessList processes={state.processes} onKill={(name) => sendCommand(`kill ${name}`)} />
+            </div>
           </div>
-          <div className="w-[40%] min-w-0">
-            <ProcessList processes={state.processes} onKill={(name) => sendCommand(`kill ${name}`)} />
-          </div>
-        </div>
-        
-        <div className="flex h-[45%] min-h-0">
-          <div className="w-[60%] min-w-0">
-            <ReferenceViewer references={state.references} stats={state.stats} />
-          </div>
-          <div className="w-[40%] min-w-0">
-            <LogFeed logs={state.logs} />
+          
+          <div className="flex h-[45%] min-h-0">
+            <div className={`${activeScenario ? 'w-[42%]' : 'w-[60%]'} min-w-0 transition-all duration-300 relative ${highlightStat ? 'narrator-highlight' : ''}`}>
+              <ReferenceViewer 
+                references={state.references} 
+                stats={state.stats}
+                onFaultConnector={handleFaultConnector}
+              />
+            </div>
+            <div className={`${activeScenario ? 'w-[58%]' : 'w-[40%]'} min-w-0 transition-all duration-300 relative ${highlightLog ? 'narrator-highlight z-10' : ''}`}>
+              <LogFeed logs={state.logs} onFrameHighlight={handleFrameHighlight} />
+            </div>
           </div>
         </div>
 
-        {/* ACTIVE ANNOTATION OVERLAY */}
-        {activeAnnotation && (
-          <div className="absolute right-6 top-6 max-w-sm bg-indigo-600 text-white p-4 rounded-xl shadow-2xl animate-in slide-in-from-right fade-in border border-indigo-500 z-20">
-            <div className="flex justify-between items-start mb-2 gap-4">
-              <div className="flex items-center gap-2">
-                <span className="bg-indigo-500 text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider text-indigo-50">{activeAnnotation.trigger}</span>
-              </div>
-              <button onClick={clearActiveAnnotation} className="text-indigo-300 hover:text-white transition-colors">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              </button>
-            </div>
-            <p className="text-sm font-medium leading-relaxed">{activeAnnotation.text}</p>
-          </div>
+        {activeScenario && (
+          <NarratorPanel 
+            scenario={activeScenario}
+            onClose={closeScenario}
+            onCommand={sendCommand}
+            lastEventType={lastEventType}
+            highlightFrameIds={highlightFrameIds}
+            setHighlightFrameIds={setHighlightFrameIds}
+            highlightStat={highlightStat}
+            setHighlightStat={setHighlightStat}
+            highlightLog={highlightLog}
+            setHighlightLog={setHighlightLog}
+          />
         )}
       </main>
 
       {/* COMMAND BAR */}
-      <footer className="flex-none z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <CommandInput onCommand={sendCommand} history={history} />
+      <footer className="flex-none z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] relative">
+        <CommandInput onCommand={sendCommand} history={history} processes={state.processes} />
       </footer>
 
       {/* MODALS */}
@@ -140,8 +209,20 @@ function App() {
           onStartScenario={startScenario} 
         />
       )}
+
+      {/* SVG CONNECTOR OVERLAY */}
+      {connector.visible && (
+        <svg className="fixed inset-0 pointer-events-none z-30" style={{width:'100vw',height:'100vh'}}>
+          <line 
+            x1={connector.from.x} y1={connector.from.y} 
+            x2={connector.to.x} y2={connector.to.y}
+            stroke={connector.color} strokeWidth="2" strokeDasharray="6 3" opacity="0.8"
+            className="connector-line-draw" 
+          />
+        </svg>
+      )}
     </div>
   )
 }
 
-export default App
+export default App;

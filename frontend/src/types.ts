@@ -49,18 +49,46 @@ export type AppState = {
   connectionStatus: 'connected' | 'disconnected'
 }
 
+// Scenario step highlight targets
+export type ScenarioHighlight = {
+  highlight_frame?: number[]
+  highlight_ref_index?: number[]
+  highlight_stat?: string
+  highlight_log?: boolean
+}
+
+// Single narrated step in a scenario
+export type ScenarioStep = {
+  narration_heading: string
+  narration_body: string
+  commands: { cmd: string; delay: number }[]
+  wait_for_event: string | null
+  highlight: ScenarioHighlight
+}
+
+// Full scenario definition
+export type Scenario = {
+  id: number
+  name: string
+  description: string
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced'
+  estimated_time: string
+  concept_tag: string
+  steps: ScenarioStep[]
+}
+
 export const PROCESS_COLORS: Record<string, string> = {
-  P1: 'var(--p1-color)',
-  P2: 'var(--p2-color)',
-  P3: 'var(--p3-color)',
-  P4: 'var(--p4-color)',
-  P5: 'var(--p5-color)'
+  P1: '#2563EB',
+  P2: '#D97706',
+  P3: '#059669',
+  P4: '#E11D48',
+  P5: '#7C3AED'
 }
 
 export const PROCESS_BGS: Record<string, string> = {
-  P1: 'var(--p1-bg)',
-  P2: 'var(--p2-bg)',
-  P3: 'var(--p3-bg)',
-  P4: 'var(--p4-bg)',
-  P5: 'var(--p5-bg)'
+  P1: 'rgba(37,99,235,0.1)',
+  P2: 'rgba(217,119,6,0.1)',
+  P3: 'rgba(5,150,105,0.1)',
+  P4: 'rgba(225,29,72,0.1)',
+  P5: 'rgba(124,58,237,0.1)'
 }

@@ -106,7 +106,63 @@ body {
 .log-feed::-webkit-scrollbar-track {
   background: transparent;
 }
-.log-feed::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 2px;
+/* Narrator highlight pulse */
+.narrator-highlight {
+  animation: narratorGlow 1.5s ease-in-out infinite;
+}
+@keyframes narratorGlow {
+  0%, 100% { box-shadow: 0 0 0 2px transparent; }
+  50% { box-shadow: 0 0 0 3px #6366F1, 0 0 16px rgba(99,102,241,0.4); }
+}
+
+/* Frame pulse (log linking) */
+.frame-pulse {
+  animation: framePulse 1s ease-out;
+}
+@keyframes framePulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99,102,241,0.6); }
+  40% { transform: scale(1.06); box-shadow: 0 0 0 8px rgba(99,102,241,0.2); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99,102,241,0); }
+}
+
+/* Focus Mode animations */
+@keyframes focusSlideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes focusDissolve {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.95); }
+}
+@keyframes focusHitGlow {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 3px #059669, 0 0 16px rgba(5,150,105,0.4); }
+}
+.focus-slide-in { animation: focusSlideIn 0.4s ease-out; }
+.focus-dissolve { animation: focusDissolve 0.3s ease-in forwards; }
+.focus-hit-glow { animation: focusHitGlow 0.3s ease-in-out; }
+
+/* SVG connector line */
+@keyframes drawLine {
+  from { stroke-dashoffset: 300; }
+  to { stroke-dashoffset: 0; }
+}
+.connector-line-draw {
+  stroke-dasharray: 300;
+  stroke-dashoffset: 0;
+  animation: drawLine 0.3s ease-out;
+}
+
+/* Narrator panel slide in */
+@keyframes narratorSlideIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.narrator-panel-enter {
+  animation: narratorSlideIn 0.25s ease-out;
+}
+
+/* Log filter chip transition */
+.log-chip-active {
+  transition: all 0.15s ease;
 }
