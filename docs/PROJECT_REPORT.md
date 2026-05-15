@@ -57,7 +57,6 @@ The project follows a three-tier architecture:
 - **Robust Event Matching**: The frontend handles asynchronous event mapping (buffering "spawn" vs "frame_update" events) to ensure reliable state transitions.
 - **Dynamic Storytelling**: Narration text interpolates live simulation statistics (faults, hits, hit ratio) directly into the educational copy.
 - **Focus Overlay**: A dynamic `backdrop-blur` dimming layer automatically isolates and highlights key statistics or memory frames during specific learning steps.
-
 ## 4. Operational Instructions
 
 ### Prerequisites

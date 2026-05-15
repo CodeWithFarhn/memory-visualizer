@@ -49,6 +49,7 @@ export function useSSE() {
       setState(s => ({ ...s, connectionStatus: 'disconnected' }));
     };
 
+
     const checkAnnotation = (triggerType: string) => {
       const match = expectedAnnotationsRef.current.find(a => a.trigger === triggerType);
       if (match) {

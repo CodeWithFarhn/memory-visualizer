@@ -1,7 +1,6 @@
 # Memory Allocation Visualizer
 
 ![Memory Visualizer Overview](docs/assets/ui_overview.png)
-
 Memory Allocation Visualizer is a Linux-based educational system that demonstrates core operating-systems memory concepts through a live simulation and visualization stack. The backend runs as a real C program using forked child processes, shared memory, semaphores, pthreads, signals, and the `/proc` filesystem. A small Python bridge exposes the backend state over HTTP and Server-Sent Events, and a React frontend renders the live simulation.
 
 The project was designed as a teaching aid for page replacement, process contention, synchronization, and demand paging. The UI is a viewer and control surface only; the backend remains the source of truth even if the frontend is closed.
@@ -162,7 +161,6 @@ exit
 ## Learning Mode
 
 ![Learning Mode Overlay](docs/assets/learning_mode.png)
-
 The frontend includes predefined scenarios for guided demonstrations:
 
 - Empty memory

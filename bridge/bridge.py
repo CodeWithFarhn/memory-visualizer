@@ -178,24 +178,6 @@ def send_command():
         # We open and close it per command to let C's select() trigger cleanly
         with open(CMD_PIPE, "w") as f:
             f.write(cmd_str + "\n")
-        # Emit a lightweight 'scenario_start' event into the state pipe
-        try:
-            envelope = {
-                'type': 'scenario_start',
-                'ts': int(time.time() * 1000),
-                'data': {'id': scenario_id}
-            }
-            # Open the state pipe for writing and write one JSON line
-            try:
-                fd = os.open(STATE_PIPE, os.O_WRONLY | os.O_NONBLOCK)
-                os.write(fd, (json.dumps(envelope) + "\n").encode('utf-8'))
-                os.close(fd)
-                print(f"[Bridge] Emitted scenario_start for id={scenario_id}")
-            except OSError as e:
-                # Non-fatal: if we can't write to the pipe, just log and continue
-                print(f"[Bridge] Could not emit scenario_start: {e}")
-        except Exception as e:
-            print(f"[Bridge] Error composing scenario_start event: {e}")
 
         return jsonify({'status': 'ok'})
     except Exception as e:

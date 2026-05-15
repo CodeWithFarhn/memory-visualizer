@@ -35,8 +35,9 @@
 #include <sys/time.h>
 #include <fcntl.h>
 
-/* ── External: shared memory pointer from shared_memory.c ────── */
+/* ── External: shared_memory.c exports ──────────────────────── */
 extern SharedMemory *shm;
+extern void shm_print_status(void);
 
 /* ── Internal helpers ─────────────────────────────────────────── */
 
@@ -45,6 +46,8 @@ static long epoch_ms(void) {
     gettimeofday(&tv, NULL);
     return (long)tv.tv_sec * 1000L + (long)tv.tv_usec / 1000L;
 }
+
+static void log_proc_stats(const char *name, pid_t pid);
 
 /*
  * read_proc_rss(pid)
@@ -164,7 +167,13 @@ static void child_loop(int slot) {
     log_event(MOD_PROCESS, "%s (PID %d) entering execution loop [%d pages]",
               entry->name, getpid(), entry->page_count);
 
+    int iter_count = 0;
     while (1) {
+        /* Periodic stats update (every 5 memory accesses) */
+        if (iter_count++ % 5 == 0) {
+            log_proc_stats(entry->name, getpid());
+        }
+
         /*
          * Determine the next page to access.
          * If a reference string is set, follow it cyclically.
@@ -209,6 +218,9 @@ static void child_loop(int slot) {
                     "\"frame_id\":%d,\"type\":\"hit\"}",
                     entry->name, page, i);
                 emit_event("alloc", json);
+                
+                /* Update frame grid */
+                shm_print_status();
                 break;
             }
         }
@@ -252,6 +264,9 @@ static void child_loop(int slot) {
                     "\"page_number\":%d,\"load_order\":%d}",
                     free_frame, entry->name, page, f->load_order);
                 emit_event("alloc", json);
+                
+                /* Update frame grid */
+                shm_print_status();
 
             } else {
                 /*

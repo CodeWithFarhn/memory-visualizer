@@ -44,6 +44,7 @@ export const NarratorPanel: React.FC<Props> = ({
   const [speed, setSpeed] = useState<'Manual' | 'Auto'>('Manual');
   const [isWaiting, setIsWaiting] = useState(false);
   const currentStepRef = useRef(currentStep);
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     currentStepRef.current = currentStep;
@@ -60,11 +61,15 @@ export const NarratorPanel: React.FC<Props> = ({
     setHighlightLog(step.highlight.highlight_log || false);
 
     // Fire commands
+    timeoutsRef.current.forEach(t => clearTimeout(t));
+    timeoutsRef.current = [];
+    
     let maxDelay = 0;
     step.commands.forEach(({ cmd, delay }) => {
-      setTimeout(() => {
+      const t = setTimeout(() => {
         onCommand(cmd);
       }, delay);
+      timeoutsRef.current.push(t);
       if (delay > maxDelay) maxDelay = delay;
     });
 
@@ -79,6 +84,9 @@ export const NarratorPanel: React.FC<Props> = ({
       setIsWaiting(false);
     }
 
+    return () => {
+      timeoutsRef.current.forEach(t => clearTimeout(t));
+    };
   }, [scenario, currentStep, onCommand, setHighlightFrameIds, setHighlightStat, setHighlightLog]);
 
   useEffect(() => {

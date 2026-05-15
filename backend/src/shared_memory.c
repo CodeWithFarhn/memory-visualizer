@@ -34,6 +34,9 @@ static int shm_id = -1;
 /* Pointer to the shared segment — exported for use by all other modules */
 SharedMemory *shm = NULL;
 
+/* Forward declaration for function used before its definition */
+void shm_print_status(void);
+
 /* ── Internal helpers ─────────────────────────────────────────── */
 
 /* Returns current time as epoch milliseconds */
@@ -223,7 +226,7 @@ int shm_alloc_frame(const char *process_name, pid_t owner_pid, int page_number)
                      "\"page_number\":%d,\"load_order\":%d}",
                      i, process_name, page_number, f->load_order);
             emit_event("alloc", json);
-
+            shm_print_status();
             return i;
         }
     }
@@ -308,6 +311,7 @@ void shm_free_frames(const char *process_name)
                  "{\"process_name\":\"%s\",\"freed_frames\":%s}",
                  process_name, json_arr);
         emit_event("release", json);
+        shm_print_status();
     }
 }
 
@@ -357,7 +361,7 @@ void shm_print_status(void)
 
     /* Emit a full status event for the bridge */
     /* Build frames JSON array */
-    char frames_json[4096] = "[";
+    char frames_json[16384] = "[";
     for (int i = 0; i < shm->total_frames; i++)
     {
         Frame *f = &shm->frames[i];
@@ -375,7 +379,7 @@ void shm_print_status(void)
     strncat(frames_json, "]", sizeof(frames_json) - strlen(frames_json) - 1);
 
     /* Build processes JSON array */
-    char processes_json[1024] = "[";
+    char processes_json[4096] = "[";
     for (int i = 0; i < MAX_PROCESSES; i++)
     {
         ProcessEntry *p = &shm->processes[i];
@@ -395,7 +399,7 @@ void shm_print_status(void)
     }
     strncat(processes_json, "]", sizeof(processes_json) - strlen(processes_json) - 1);
 
-    char status_json[6144];
+    char status_json[65536];
     snprintf(status_json, sizeof(status_json),
              "{\"frames\":%s,\"processes\":%s,\"total_frames\":%d,\"free_frames\":%d,"
              "\"algorithm\":\"%s\",\"fault_count\":%d,\"hit_count\":%d}",
