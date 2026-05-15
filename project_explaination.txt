@@ -1,0 +1,40 @@
+# Memory Allocation Visualizer - Startup Log Explanation
+
+When the Memory Allocation Visualizer backend starts, it performs a series of initialization steps to set up the simulation environment. Here is a breakdown of what each log entry means:
+
+### 1. [SYSTEM] PID: 23027
+- **Meaning**: This is the Linux Process ID (PID) of the `memory_manager` process. 
+- **Context**: Every running program on Linux has a unique ID. You can use this ID to inspect the process via system tools like `top` or `ps`.
+
+### 2. [MEMORY] shmget() -> segment key=0x4D454D30 ...
+- **Meaning**: The backend is allocating a "Shared Memory" segment in the RAM. 
+- **Details**: 
+    - `shmget()` is the system call used to create this memory.
+    - `key=0x4D454D30` is a unique identifier (it translates to "MEM0" in hex).
+    - This memory is shared between the main manager and all the simulated child processes.
+
+### 3. [MEMORY] Frame pool ready: 8 frames | algorithm: fifo
+- **Meaning**: The simulation has partitioned the shared memory into 8 "physical frames."
+- **Context**: These frames represent your physical RAM. The `fifo` (First-In-First-Out) algorithm is selected as the default policy for deciding which page to remove when memory gets full.
+
+### 4. [SYNC] Semaphore /mem_lock created (initial=1)
+- **Meaning**: A "Mutex" (Mutual Exclusion) lock has been created.
+- **Context**: Since multiple processes access the same memory, this lock ensures that only one process can modify the frame pool at a time, preventing data corruption.
+
+### 5. [SYNC] Semaphore /fault_requested & /fault_resolved
+- **Meaning**: These are signaling mechanisms between the simulated processes and the Kernel.
+- **Context**: 
+    - `/fault_requested`: A process "pings" this when it needs a page that isn't in RAM.
+    - `/fault_resolved`: The Kernel "pings" this back to tell the process it can continue now that the page is loaded.
+
+### 6. [PROCESS] Process manager initialized (SIGCHLD handler installed)
+- **Meaning**: The system is ready to spawn new simulated processes.
+- **Context**: The `SIGCHLD` handler is a safety feature that automatically cleans up "zombie" processes when they finish running.
+
+### 7. [SYSTEM] Awaiting commands... (stdin or /tmp/mem_pipe)
+- **Meaning**: The backend is now idling and waiting for your instructions.
+- **Context**: It can receive commands directly from your keyboard (`stdin`) or from the web UI via a "Named Pipe" (`/tmp/mem_pipe`).
+
+### 8. [REPLACE] Thread started (algorithm: fifo)
+- **Meaning**: A background worker thread has been launched.
+- **Context**: This thread is the "intelligence" of the OS. It sits in the background and only wakes up when a page fault occurs to decide which page to evict.

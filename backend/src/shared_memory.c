@@ -26,7 +26,7 @@
  * We use a fixed key rather than ftok() so the key is predictable
  * and easy to inspect with `ipcs -m` during debugging.
  */
-#define SHM_KEY  0x4D454D30   /* "MEM0" in hex */
+#define SHM_KEY 0x4D454D30 /* "MEM0" in hex */
 
 /* ── Module-level state ──────────────────────────────────────── */
 static int shm_id = -1;
@@ -37,7 +37,8 @@ SharedMemory *shm = NULL;
 /* ── Internal helpers ─────────────────────────────────────────── */
 
 /* Returns current time as epoch milliseconds */
-static long current_epoch_ms(void) {
+static long current_epoch_ms(void)
+{
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return (long)tv.tv_sec * 1000L + (long)tv.tv_usec / 1000L;
@@ -50,37 +51,41 @@ static long current_epoch_ms(void) {
  *   Marks all frames as free and resets pool counters.
  *   Called at startup and when the `frames <N>` command is received.
  */
-static void init_frame_pool(int frame_count, const char *algorithm) {
-    if (frame_count < 1 || frame_count > MAX_FRAMES) {
+static void init_frame_pool(int frame_count, const char *algorithm)
+{
+    if (frame_count < 1 || frame_count > MAX_FRAMES)
+    {
         log_event(MOD_ERROR, "Invalid frame count %d — must be 1..%d",
                   frame_count, MAX_FRAMES);
         return;
     }
 
     /* Reset all frame slots */
-    for (int i = 0; i < MAX_FRAMES; i++) {
-        shm->frames[i].frame_id    = i;
-        shm->frames[i].occupied    = 0;
-        shm->frames[i].owner_pid   = 0;
+    for (int i = 0; i < MAX_FRAMES; i++)
+    {
+        shm->frames[i].frame_id = i;
+        shm->frames[i].occupied = 0;
+        shm->frames[i].owner_pid = 0;
         shm->frames[i].page_number = -1;
-        shm->frames[i].last_used   = 0;
-        shm->frames[i].load_order  = 0;
+        shm->frames[i].last_used = 0;
+        shm->frames[i].load_order = 0;
         memset(shm->frames[i].process_name, 0,
                sizeof(shm->frames[i].process_name));
     }
 
     /* Reset process table */
-    for (int i = 0; i < MAX_PROCESSES; i++) {
+    for (int i = 0; i < MAX_PROCESSES; i++)
+    {
         shm->processes[i].active = 0;
     }
 
     /* Set counters */
-    shm->total_frames     = frame_count;
-    shm->free_frames      = frame_count;
-    shm->fault_count      = 0;
-    shm->hit_count        = 0;
+    shm->total_frames = frame_count;
+    shm->free_frames = frame_count;
+    shm->fault_count = 0;
+    shm->hit_count = 0;
     shm->algo_switch_flag = 0;
-    shm->load_counter     = 0;
+    shm->load_counter = 0;
 
     strncpy(shm->algorithm, algorithm, sizeof(shm->algorithm) - 1);
     shm->algorithm[sizeof(shm->algorithm) - 1] = '\0';
@@ -94,28 +99,33 @@ static void init_frame_pool(int frame_count, const char *algorithm) {
  *   Initializes the frame pool and process table.
  *   Returns 0 on success, -1 on failure.
  */
-int shm_init(int frame_count, const char *algorithm) {
+int shm_init(int frame_count, const char *algorithm)
+{
     /* Create the shared memory segment */
     shm_id = shmget(SHM_KEY, sizeof(SharedMemory),
                     IPC_CREAT | IPC_EXCL | 0666);
 
-    if (shm_id == -1) {
-        if (errno == EEXIST) {
+    if (shm_id == -1)
+    {
+        if (errno == EEXIST)
+        {
             /*
              * A leftover segment exists from a previous crashed run.
              * Remove it and try again — this keeps dev restarts clean.
              */
             log_event(MOD_SYSTEM,
-                "Stale shared memory segment found — removing and recreating");
+                      "Stale shared memory segment found — removing and recreating");
 
             int old_id = shmget(SHM_KEY, 0, 0666);
-            if (old_id != -1) shmctl(old_id, IPC_RMID, NULL);
+            if (old_id != -1)
+                shmctl(old_id, IPC_RMID, NULL);
 
             shm_id = shmget(SHM_KEY, sizeof(SharedMemory),
                             IPC_CREAT | IPC_EXCL | 0666);
         }
 
-        if (shm_id == -1) {
+        if (shm_id == -1)
+        {
             log_event(MOD_ERROR, "shmget() failed: %s", strerror(errno));
             return -1;
         }
@@ -123,7 +133,8 @@ int shm_init(int frame_count, const char *algorithm) {
 
     /* Attach the segment to our address space */
     shm = (SharedMemory *)shmat(shm_id, NULL, 0);
-    if (shm == (SharedMemory *)-1) {
+    if (shm == (SharedMemory *)-1)
+    {
         log_event(MOD_ERROR, "shmat() failed: %s", strerror(errno));
         shm = NULL;
         return -1;
@@ -143,9 +154,9 @@ int shm_init(int frame_count, const char *algorithm) {
     /* Emit typed event for the bridge */
     char json[256];
     snprintf(json, sizeof(json),
-        "{\"total_frames\":%d,\"free_frames\":%d,\"algorithm\":\"%s\","
-        "\"fault_count\":0,\"hit_count\":0}",
-        frame_count, frame_count, algorithm);
+             "{\"total_frames\":%d,\"free_frames\":%d,\"algorithm\":\"%s\","
+             "\"fault_count\":0,\"hit_count\":0}",
+             frame_count, frame_count, algorithm);
     emit_event("status", json);
 
     return 0;
@@ -157,16 +168,18 @@ int shm_init(int frame_count, const char *algorithm) {
  *   Used by the `frames <N>` command.
  *   Assumes all child processes have been terminated first.
  */
-void shm_reinit(int frame_count) {
-    if (!shm) return;
+void shm_reinit(int frame_count)
+{
+    if (!shm)
+        return;
     init_frame_pool(frame_count, shm->algorithm);
     log_event(MOD_MEMORY, "Frame pool reinitialized: %d frames", frame_count);
 
     char json[256];
     snprintf(json, sizeof(json),
-        "{\"total_frames\":%d,\"free_frames\":%d,\"algorithm\":\"%s\","
-        "\"fault_count\":0,\"hit_count\":0}",
-        frame_count, frame_count, shm->algorithm);
+             "{\"total_frames\":%d,\"free_frames\":%d,\"algorithm\":\"%s\","
+             "\"fault_count\":0,\"hit_count\":0}",
+             frame_count, frame_count, shm->algorithm);
     emit_event("status", json);
 }
 
@@ -177,17 +190,21 @@ void shm_reinit(int frame_count) {
  *
  *   Caller must hold /mem_lock before calling.
  */
-int shm_alloc_frame(const char *process_name, pid_t owner_pid, int page_number) {
-    if (!shm) return -1;
+int shm_alloc_frame(const char *process_name, pid_t owner_pid, int page_number)
+{
+    if (!shm)
+        return -1;
 
-    for (int i = 0; i < shm->total_frames; i++) {
-        if (!shm->frames[i].occupied) {
+    for (int i = 0; i < shm->total_frames; i++)
+    {
+        if (!shm->frames[i].occupied)
+        {
             Frame *f = &shm->frames[i];
-            f->occupied    = 1;
-            f->owner_pid   = owner_pid;
+            f->occupied = 1;
+            f->owner_pid = owner_pid;
             f->page_number = page_number;
-            f->last_used   = current_epoch_ms();
-            f->load_order  = shm->load_counter++;
+            f->last_used = current_epoch_ms();
+            f->load_order = shm->load_counter++;
             strncpy(f->process_name, process_name,
                     sizeof(f->process_name) - 1);
             f->process_name[sizeof(f->process_name) - 1] = '\0';
@@ -196,15 +213,15 @@ int shm_alloc_frame(const char *process_name, pid_t owner_pid, int page_number) 
             shm->hit_count++;
 
             log_event(MOD_MEMORY,
-                "Frame %d → %s, Page %d [free: %d/%d]",
-                i, process_name, page_number,
-                shm->free_frames, shm->total_frames);
+                      "Frame %d → %s, Page %d [free: %d/%d]",
+                      i, process_name, page_number,
+                      shm->free_frames, shm->total_frames);
 
             char json[256];
             snprintf(json, sizeof(json),
-                "{\"frame_id\":%d,\"process_name\":\"%s\","
-                "\"page_number\":%d,\"load_order\":%d}",
-                i, process_name, page_number, f->load_order);
+                     "{\"frame_id\":%d,\"process_name\":\"%s\","
+                     "\"page_number\":%d,\"load_order\":%d}",
+                     i, process_name, page_number, f->load_order);
             emit_event("alloc", json);
 
             return i;
@@ -214,13 +231,13 @@ int shm_alloc_frame(const char *process_name, pid_t owner_pid, int page_number) 
     /* No free frame found — page fault */
     shm->fault_count++;
     log_event(MOD_MEMORY,
-        "No free frame for %s Page %d — page fault [faults: %d]",
-        process_name, page_number, shm->fault_count);
+              "No free frame for %s Page %d — page fault [faults: %d]",
+              process_name, page_number, shm->fault_count);
 
     char json[128];
     snprintf(json, sizeof(json),
-        "{\"process_name\":\"%s\",\"page_number\":%d,\"frames_full\":true}",
-        process_name, page_number);
+             "{\"process_name\":\"%s\",\"page_number\":%d,\"frames_full\":true}",
+             process_name, page_number);
     emit_event("fault", json);
 
     return -1;
@@ -231,21 +248,25 @@ int shm_alloc_frame(const char *process_name, pid_t owner_pid, int page_number) 
  *   Releases all frames owned by process_name.
  *   Caller must hold /mem_lock before calling.
  */
-void shm_free_frames(const char *process_name) {
-    if (!shm) return;
+void shm_free_frames(const char *process_name)
+{
+    if (!shm)
+        return;
 
     int freed[MAX_FRAMES];
     int freed_count = 0;
 
-    for (int i = 0; i < shm->total_frames; i++) {
+    for (int i = 0; i < shm->total_frames; i++)
+    {
         if (shm->frames[i].occupied &&
-            strncmp(shm->frames[i].process_name, process_name, 8) == 0) {
+            strncmp(shm->frames[i].process_name, process_name, 8) == 0)
+        {
 
-            shm->frames[i].occupied    = 0;
-            shm->frames[i].owner_pid   = 0;
+            shm->frames[i].occupied = 0;
+            shm->frames[i].owner_pid = 0;
             shm->frames[i].page_number = -1;
-            shm->frames[i].last_used   = 0;
-            shm->frames[i].load_order  = 0;
+            shm->frames[i].last_used = 0;
+            shm->frames[i].load_order = 0;
             memset(shm->frames[i].process_name, 0,
                    sizeof(shm->frames[i].process_name));
 
@@ -254,10 +275,12 @@ void shm_free_frames(const char *process_name) {
         }
     }
 
-    if (freed_count > 0) {
+    if (freed_count > 0)
+    {
         /* Build the freed frame list string for logging */
         char frame_list[128] = "";
-        for (int i = 0; i < freed_count; i++) {
+        for (int i = 0; i < freed_count; i++)
+        {
             char tmp[8];
             snprintf(tmp, sizeof(tmp), "%d%s",
                      freed[i], (i < freed_count - 1) ? "," : "");
@@ -265,13 +288,14 @@ void shm_free_frames(const char *process_name) {
                     sizeof(frame_list) - strlen(frame_list) - 1);
         }
         log_event(MOD_MEMORY,
-            "%s released frames [%s] [free: %d/%d]",
-            process_name, frame_list,
-            shm->free_frames, shm->total_frames);
+                  "%s released frames [%s] [free: %d/%d]",
+                  process_name, frame_list,
+                  shm->free_frames, shm->total_frames);
 
         /* Build JSON array for the event */
         char json_arr[256] = "[";
-        for (int i = 0; i < freed_count; i++) {
+        for (int i = 0; i < freed_count; i++)
+        {
             char tmp[8];
             snprintf(tmp, sizeof(tmp), "%d%s",
                      freed[i], (i < freed_count - 1) ? "," : "");
@@ -281,8 +305,8 @@ void shm_free_frames(const char *process_name) {
 
         char json[320];
         snprintf(json, sizeof(json),
-            "{\"process_name\":\"%s\",\"freed_frames\":%s}",
-            process_name, json_arr);
+                 "{\"process_name\":\"%s\",\"freed_frames\":%s}",
+                 process_name, json_arr);
         emit_event("release", json);
     }
 }
@@ -292,8 +316,10 @@ void shm_free_frames(const char *process_name) {
  *   Prints the full frame pool state to stdout.
  *   Called by the `status` command.
  */
-void shm_print_status(void) {
-    if (!shm) {
+void shm_print_status(void)
+{
+    if (!shm)
+    {
         log_event(MOD_SYSTEM, "Shared memory not initialized");
         return;
     }
@@ -305,7 +331,7 @@ void shm_print_status(void) {
            shm->fault_count, shm->hit_count,
            (shm->fault_count + shm->hit_count) > 0
                ? (double)shm->hit_count /
-                 (double)(shm->fault_count + shm->hit_count) * 100.0
+                     (double)(shm->fault_count + shm->hit_count) * 100.0
                : 0.0);
 
     printf("  %-6s  %-10s  %-6s  %-8s\n",
@@ -313,12 +339,16 @@ void shm_print_status(void) {
     printf("  %-6s  %-10s  %-6s  %-8s\n",
            "-----", "-------", "----", "------");
 
-    for (int i = 0; i < shm->total_frames; i++) {
+    for (int i = 0; i < shm->total_frames; i++)
+    {
         Frame *f = &shm->frames[i];
-        if (f->occupied) {
+        if (f->occupied)
+        {
             printf("  \033[32m%-6d  %-10s  %-6d  occupied\033[0m\n",
                    f->frame_id, f->process_name, f->page_number);
-        } else {
+        }
+        else
+        {
             printf("  \033[90m%-6d  %-10s  %-6s  free\033[0m\n",
                    f->frame_id, "—", "—");
         }
@@ -328,27 +358,49 @@ void shm_print_status(void) {
     /* Emit a full status event for the bridge */
     /* Build frames JSON array */
     char frames_json[4096] = "[";
-    for (int i = 0; i < shm->total_frames; i++) {
+    for (int i = 0; i < shm->total_frames; i++)
+    {
         Frame *f = &shm->frames[i];
         char entry[256];
         snprintf(entry, sizeof(entry),
-            "{\"frame_id\":%d,\"occupied\":%d,\"process_name\":\"%s\","
-            "\"page_number\":%d,\"load_order\":%d,\"last_used\":%ld}%s",
-            f->frame_id, f->occupied,
-            f->occupied ? f->process_name : "",
-            f->page_number, f->load_order, f->last_used,
-            (i < shm->total_frames - 1) ? "," : "");
+                 "{\"frame_id\":%d,\"occupied\":%d,\"process_name\":\"%s\","
+                 "\"page_number\":%d,\"load_order\":%d,\"last_used\":%ld}%s",
+                 f->frame_id, f->occupied,
+                 f->occupied ? f->process_name : "",
+                 f->page_number, f->load_order, f->last_used,
+                 (i < shm->total_frames - 1) ? "," : "");
         strncat(frames_json, entry,
                 sizeof(frames_json) - strlen(frames_json) - 1);
     }
     strncat(frames_json, "]", sizeof(frames_json) - strlen(frames_json) - 1);
 
-    char status_json[5120];
+    /* Build processes JSON array */
+    char processes_json[1024] = "[";
+    for (int i = 0; i < MAX_PROCESSES; i++)
+    {
+        ProcessEntry *p = &shm->processes[i];
+        if (!p->active)
+            continue;
+        char entry[256];
+        snprintf(entry, sizeof(entry),
+                 "{\"process_name\":\"%s\",\"pid\":%d,\"page_count\":%d,\"active\":1},",
+                 p->name, (int)p->pid, p->page_count);
+        strncat(processes_json, entry, sizeof(processes_json) - strlen(processes_json) - 1);
+    }
+    /* Remove trailing comma if present */
+    size_t pjlen = strlen(processes_json);
+    if (pjlen > 1 && processes_json[pjlen - 1] == ',')
+    {
+        processes_json[pjlen - 1] = '\0';
+    }
+    strncat(processes_json, "]", sizeof(processes_json) - strlen(processes_json) - 1);
+
+    char status_json[6144];
     snprintf(status_json, sizeof(status_json),
-        "{\"frames\":%s,\"total_frames\":%d,\"free_frames\":%d,"
-        "\"algorithm\":\"%s\",\"fault_count\":%d,\"hit_count\":%d}",
-        frames_json, shm->total_frames, shm->free_frames,
-        shm->algorithm, shm->fault_count, shm->hit_count);
+             "{\"frames\":%s,\"processes\":%s,\"total_frames\":%d,\"free_frames\":%d,"
+             "\"algorithm\":\"%s\",\"fault_count\":%d,\"hit_count\":%d}",
+             frames_json, processes_json, shm->total_frames, shm->free_frames,
+             shm->algorithm, shm->fault_count, shm->hit_count);
     emit_event("status", status_json);
 }
 
@@ -357,12 +409,15 @@ void shm_print_status(void) {
  *   Detaches and removes the shared memory segment.
  *   Called from cleanup() in memory_manager.c.
  */
-void shm_destroy(void) {
-    if (shm) {
+void shm_destroy(void)
+{
+    if (shm)
+    {
         shmdt(shm);
         shm = NULL;
     }
-    if (shm_id != -1) {
+    if (shm_id != -1)
+    {
         shmctl(shm_id, IPC_RMID, NULL);
         log_event(MOD_MEMORY, "Shared memory segment removed (id=%d)", shm_id);
         shm_id = -1;

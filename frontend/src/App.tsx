@@ -41,6 +41,7 @@ function App() {
     setHighlightFrameIds([]);
     setHighlightStat(null);
     setHighlightLog(false);
+    sendCommand('reset');
   };
 
   const handleAlgorithmChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -96,9 +97,16 @@ function App() {
 
   const mainAreaWidth = activeScenario ? 'w-full' : 'w-full'; // layout adjustments
   
+  const isDimmed = activeScenario && (highlightFrameIds.length > 0 || highlightStat !== null || highlightLog);
+
   return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden bg-[var(--bg)] text-gray-900 font-ui selection:bg-blue-200">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-[var(--bg)] text-gray-900 font-ui selection:bg-blue-200 relative">
       
+      {/* DIMMING OVERLAY */}
+      {isDimmed && (
+        <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-[2px] pointer-events-none transition-opacity duration-300 z-40"></div>
+      )}
+
       {/* HEADER / MEMORY BAR */}
       <header className="flex-none h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 shadow-sm z-10 bg-gradient-to-b from-white to-gray-50/50">
         <div className="flex items-center gap-4">
@@ -152,8 +160,8 @@ function App() {
       {/* MAIN LAYOUT */}
       <main className="flex-1 flex min-h-0 relative">
         <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex h-[55%] min-h-0">
-            <div className={`${activeScenario ? 'w-[42%]' : 'w-[60%]'} min-w-0 transition-all duration-300`}>
+          <div className={`flex min-h-0 ${activeScenario ? 'h-[52%]' : 'h-[55%]'}`}>
+            <div className={`${activeScenario ? 'w-[62%]' : 'w-[60%]'} min-w-0 transition-all duration-300 relative ${highlightFrameIds.length > 0 ? 'z-50' : ''}`}>
               <FrameGrid 
                 frames={state.frames} 
                 references={state.references} 
@@ -162,20 +170,20 @@ function App() {
                 frameCardRefs={frameCardRefs}
               />
             </div>
-            <div className={`${activeScenario ? 'w-[58%]' : 'w-[40%]'} min-w-0 transition-all duration-300`}>
+            <div className={`${activeScenario ? 'w-[38%]' : 'w-[40%]'} min-w-0 transition-all duration-300`}>
               <ProcessList processes={state.processes} onKill={(name) => sendCommand(`kill ${name}`)} />
             </div>
           </div>
           
-          <div className="flex h-[45%] min-h-0">
-            <div className={`${activeScenario ? 'w-[42%]' : 'w-[60%]'} min-w-0 transition-all duration-300 relative ${highlightStat ? 'narrator-highlight' : ''}`}>
+          <div className={`flex min-h-0 ${activeScenario ? 'h-[48%]' : 'h-[45%]'}`}>
+            <div className={`${activeScenario ? 'w-[62%]' : 'w-[60%]'} min-w-0 transition-all duration-300 relative ${highlightStat ? 'narrator-highlight z-50 bg-white rounded-xl' : ''}`}>
               <ReferenceViewer 
                 references={state.references} 
                 stats={state.stats}
                 onFaultConnector={handleFaultConnector}
               />
             </div>
-            <div className={`${activeScenario ? 'w-[58%]' : 'w-[40%]'} min-w-0 transition-all duration-300 relative ${highlightLog ? 'narrator-highlight z-10' : ''}`}>
+            <div className={`${activeScenario ? 'w-[38%]' : 'w-[40%]'} min-w-0 transition-all duration-300 relative ${highlightLog ? 'narrator-highlight z-50 bg-[#0f172a] rounded-xl' : ''}`}>
               <LogFeed logs={state.logs} onFrameHighlight={handleFrameHighlight} />
             </div>
           </div>
@@ -184,6 +192,7 @@ function App() {
         {activeScenario && (
           <NarratorPanel 
             scenario={activeScenario}
+            state={state}
             onClose={closeScenario}
             onCommand={sendCommand}
             lastEventType={lastEventType}

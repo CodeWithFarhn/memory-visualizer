@@ -1,8 +1,30 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Scenario } from '../types';
+import { Scenario, AppState } from '../types';
+
+const matchesWaitEvent = (wait: string | null, eventType: string | null) => {
+  if (!wait || !eventType) return false;
+  if (wait === eventType) return true;
+  
+  const frameEvents = ['alloc', 'evict', 'release', 'status', 'proc', 'hit', 'fault', 'frame_update'];
+  
+  if (wait === 'frame_update') {
+    return frameEvents.includes(eventType);
+  }
+  
+  if (wait === 'spawn') {
+    return ['spawn', ...frameEvents].includes(eventType);
+  }
+
+  if (wait === 'fault') {
+    return ['fault', 'hit', 'frame_update', 'alloc'].includes(eventType);
+  }
+
+  return false;
+};
 
 interface Props {
   scenario: Scenario | null;
+  state: AppState;
   onClose: () => void;
   onCommand: (cmd: string) => void;
   lastEventType: string | null;
@@ -15,7 +37,7 @@ interface Props {
 }
 
 export const NarratorPanel: React.FC<Props> = ({ 
-  scenario, onClose, onCommand, lastEventType,
+  scenario, state, onClose, onCommand, lastEventType,
   setHighlightFrameIds, setHighlightStat, setHighlightLog
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -47,7 +69,12 @@ export const NarratorPanel: React.FC<Props> = ({
     });
 
     if (step.wait_for_event) {
-      setIsWaiting(true);
+      // If the required event already occurred, don't enter waiting state.
+      if (matchesWaitEvent(step.wait_for_event, lastEventType)) {
+        setIsWaiting(false);
+      } else {
+        setIsWaiting(true);
+      }
     } else {
       setIsWaiting(false);
     }
@@ -59,7 +86,7 @@ export const NarratorPanel: React.FC<Props> = ({
     const step = scenario.steps[currentStep];
     if (!step) return;
 
-    if (isWaiting && step.wait_for_event && lastEventType === step.wait_for_event) {
+    if (isWaiting && step.wait_for_event && matchesWaitEvent(step.wait_for_event, lastEventType)) {
       setIsWaiting(false);
     }
   }, [lastEventType, isWaiting, scenario, currentStep]);
@@ -78,8 +105,20 @@ export const NarratorPanel: React.FC<Props> = ({
   const step = scenario.steps[currentStep];
   const isLast = currentStep === scenario.steps.length - 1;
 
+  const interpolateText = (text: string) => {
+    if (!text) return text;
+    let interpolated = text;
+    interpolated = interpolated.replace(/{{stats\.faults}}/g, state.stats.faults.toString());
+    interpolated = interpolated.replace(/{{stats\.hits}}/g, state.stats.hits.toString());
+    const hitRatio = state.stats.total > 0 ? Math.round((state.stats.hits / state.stats.total) * 100) : 0;
+    interpolated = interpolated.replace(/{{stats\.hit_ratio}}/g, `${hitRatio}%`);
+    const freeFrames = state.frames.filter(f => f.status === 'free').length;
+    interpolated = interpolated.replace(/{{frames\.free}}/g, freeFrames.toString());
+    return interpolated;
+  };
+
   return (
-    <div className="h-full w-[280px] bg-white border-l border-gray-200 flex flex-col shadow-[-4px_0_12px_rgba(0,0,0,0.03)] narrator-panel-enter z-20 shrink-0">
+    <div className="h-full w-[280px] bg-white border-l border-gray-200 flex flex-col shadow-[-4px_0_12px_rgba(0,0,0,0.03)] narrator-panel-enter z-50 relative shrink-0">
       <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-indigo-50">
         <h2 className="font-bold text-indigo-900 truncate pr-2">{scenario.name}</h2>
         <button onClick={onClose} className="text-indigo-400 hover:text-indigo-700 transition-colors">
@@ -126,7 +165,7 @@ export const NarratorPanel: React.FC<Props> = ({
 
           <h3 className="text-xl font-bold text-gray-900 mb-3 leading-tight">{step.narration_heading}</h3>
           <p className="text-gray-700 text-sm leading-[1.6] mb-4">
-            {step.narration_body}
+            {interpolateText(step.narration_body)}
           </p>
 
           {step.commands.length > 0 && (

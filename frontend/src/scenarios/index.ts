@@ -19,7 +19,7 @@ export const scenarios: Scenario[] = [
     steps: [
       {
         narration_heading: 'Physical memory at rest',
-        narration_body: 'This is physical memory — 8 empty frames, each one a slot where a page can live. Think of frames as numbered parking spaces. Right now every space is empty.',
+        narration_body: 'This is physical memory — 8 empty frames, each one a slot where a page can live. Think of frames as numbered parking spaces. Right now we have {{frames.free}} empty spaces.',
         commands: [
           { cmd: 'reset', delay: 0 },
           { cmd: 'frames 8', delay: 300 },
@@ -39,7 +39,7 @@ export const scenarios: Scenario[] = [
       },
       {
         narration_heading: 'Pages resident in memory',
-        narration_body: "P1's pages are now resident in memory. Any access to these pages will be a fast hit — no loading needed. Notice the green dots on the reference string: every access was satisfied immediately.",
+        narration_body: "P1's pages are now resident in memory. Any access to these pages will be a fast hit. Notice the green dots on the reference string: every access was satisfied immediately, giving us {{stats.hits}} hits and a {{stats.hit_ratio}} hit ratio so far!",
         commands: [],
         wait_for_event: 'frame_update',
         highlight: { highlight_stat: 'hit_ratio' }
